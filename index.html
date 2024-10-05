@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>词根掌握度测试游戏</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1, h2 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        #word-selection, #game-container, #error-bank, #import-section {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #word-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .word-item {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .word-item:hover {
+            background-color: #bdc3c7;
+        }
+        .word-item.selected {
+            background-color: #2ecc71;
+            color: #fff;
+        }
+        .word-item.root {
+            background-color: #e74c3c;
+            color: #fff;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .pagination button {
+            margin: 0 5px;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>词根掌握度测试游戏</h1>
+    <div id="import-section">
+        <h2>导入单词</h2>
+        <input type="file" id="excel-file" accept=".xlsx, .xls">
+        <button onclick="importWords()">导入Excel文件</button>
+    </div>
+    <div id="word-selection">
+        <h2>选择要测试的单词</h2>
+        <div>
+            <button onclick="toggleRootWords()">切换词根/普通单词</button>
+            <button onclick="toggleErrorBank()">切换错题库</button>
+        </div>
+        <div id="word-list"></div>
+        <div class="pagination">
+            <button onclick="changePage(-1)">上一页</button>
+            <span id="page-info"></span>
+            <button onclick="changePage(1)">下一页</button>
+        </div>
+        <button onclick="startSelectedGame('en-to-zh')">英译中</button>
+        <button onclick="startSelectedGame('zh-to-en')">中译英</button>
+        <button onclick="startSelectedGame('mixed')">混合模式</button>
+    </div>
+    <div id="game-container"></div>
+    <div id="error-bank" style="display: none;">
+        <h2>错题库</h2>
+        <div id="error-word-list"></div>
+        <button onclick="startErrorBankGame()">开始错题测试</button>
+    </div>
+
+    <script>
+    let wordDatabase = [];
+    let selectedWords = [];
+    let currentWords = [];
+    let currentQuestion = null;
+    let score = 0;
+    let totalQuestions = 0;
+    let currentPage = 1;
+    const wordsPerPage = 20;
+    let showingRootWords = false;
+    let errorBank = JSON.parse(localStorage.getItem('errorBank')) || {};
+    let showingErrorBank = false;
+
+    function importWords() {
+        const fileInput = document.getElementById('excel-file');
+        const file = fileInput.files[0];
+        if (!file) {
+            alert('请选择一个Excel文件');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('file', file);
+        fetch('/import_words', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                alert(data.message);
+                loadWords(); // 确保在导入成功后重新加载单词
+            }
+        })
+        .catch(error => {
+            console.error('Error importing words:', error);
+            alert('导入单词时出错，请查看控制台以获取更多信息。');
+        });
+    }
+
+    function loadWords() {
+        fetch('/words')
+        .then(response => response.json())
+        .then(data => {
+            wordDatabase = data;
+            initializeWordList();
+            console.log('Words loaded:', wordDatabase); // 添加这行来检查加载的单词
+        })
+        .catch(error => {
+            console.error('Error loading words:', error);
+            alert('加载单词时出错，请查看控制台以获取更多信息。');
+        });
+    }
+
+    function initializeWordList() {
+        const wordList = document.getElementById('word-list');
+        wordList.innerHTML = '';
+        const startIndex = (currentPage - 1) * wordsPerPage;
+        const endIndex = startIndex + wordsPerPage;
+        const currentWords = wordDatabase.filter(word => word.is_root === showingRootWords).slice(startIndex, endIndex);
+
+        currentWords.forEach(word => {
+            const wordItem = document.createElement('div');
+            wordItem.className = `word-item ${word.is_root ? 'root' : ''}`;
+            wordItem.textContent = word.en;
+            wordItem.onclick = () => toggleWordSelection(word.id, wordItem);
+            wordList.appendChild(wordItem);
+        });
+
+        updatePageInfo();
+    }
+
+    function updatePageInfo() {
+        const totalWords = wordDatabase.filter(word => word.is_root === showingRootWords).length;
+        const totalPages = Math.ceil(totalWords / wordsPerPage);
+        document.getElementById('page-info').textContent = `第 ${currentPage} 页，共 ${totalPages} 页`;
+    }
+
+    function changePage(delta) {
+        const totalWords = wordDatabase.filter(word => word.is_root === showingRootWords).length;
+        const totalPages = Math.ceil(totalWords / wordsPerPage);
+        currentPage = Math.max(1, Math.min(currentPage + delta, totalPages));
+        initializeWordList();
+    }
+
+    function toggleRootWords() {
+        showingRootWords = !showingRootWords;
+        currentPage = 1;
+        initializeWordList();
+    }
+
+    function toggleErrorBank() {
+        showingErrorBank = !showingErrorBank;
+        document.getElementById('word-selection').style.display = showingErrorBank ? 'none' : 'block';
+        document.getElementById('error-bank').style.display = showingErrorBank ? 'block' : 'none';
+        if (showingErrorBank) {
+            updateErrorBankDisplay();
+        }
+    }
+
+    function updateErrorBankDisplay() {
+        const errorWordList = document.getElementById('error-word-list');
+        errorWordList.innerHTML = '';
+        Object.entries(errorBank).forEach(([wordId, count]) => {
+            const word = wordDatabase.find(w => w.id === parseInt(wordId));
+            if (word) {
+                const wordItem = document.createElement('div');
+                wordItem.className = 'word-item';
+                wordItem.textContent = `${word.en} (错误次数: ${count})`;
+                errorWordList.appendChild(wordItem);
+            }
+        });
+    }
+
+    function toggleWordSelection(wordId, element) {
+        const index = selectedWords.indexOf(wordId);
+        if (index > -1) {
+            selectedWords.splice(index, 1);
+            element.classList.remove('selected');
+        } else {
+            selectedWords.push(wordId);
+            element.classList.add('selected');
+        }
+    }
+
+    function startSelectedGame(mode) {
+        if (selectedWords.length === 0) {
+            alert('请至少选择一个单词！');
+            return;
+        }
+        currentWords = wordDatabase.filter(word => selectedWords.includes(word.id));
+        score = 0;
+        totalQuestions = 0;
+        nextQuestion(mode);
+    }
+
+    function startErrorBankGame() {
+        currentWords = Object.keys(errorBank).map(id => wordDatabase.find(w => w.id === parseInt(id)));
+        if (currentWords.length === 0) {
+            alert('错题库为空！');
+            return;
+        }
+        score = 0;
+        totalQuestions = 0;
+        nextQuestion('mixed');
+    }
+
+    function nextQuestion(mode) {
+        if (currentWords.length === 0) {
+            endGame();
+            return;
+        }
+
+        const index = Math.floor(Math.random() * currentWords.length);
+        currentQuestion = currentWords[index];
+        currentWords.splice(index, 1);
+
+        let questionHtml = '';
+        if (mode === 'en-to-zh' || (mode === 'mixed' && Math.random() < 0.5)) {
+            questionHtml = `
+                <h2>请选择"${currentQuestion.en}"的中文含义：</h2>
+                ${generateOptions('zh')}
+            `;
+        } else {
+            questionHtml = `
+                <h2>请选择"${currentQuestion.zh}"的英文单词：</h2>
+                ${generateOptions('en')}
+            `;
+        }
+
+        document.getElementById('game-container').innerHTML = questionHtml;
+        totalQuestions++;
+    }
+
+    function generateOptions(lang) {
+        const options = [currentQuestion[lang]];
+        while (options.length < 4) {
+            const randomWord = wordDatabase[Math.floor(Math.random() * wordDatabase.length)][lang];
+            if (!options.includes(randomWord)) {
+                options.push(randomWord);
+            }
+        }
+        shuffleArray(options);
+
+        return options.map((option, index) => 
+            `<button onclick="checkAnswer('${option}')">${option}</button>`
+        ).join('');
+    }
+
+    function checkAnswer(answer) {
+        if (answer === currentQuestion.en || answer === currentQuestion.zh) {
+            score++;
+            alert('回答正确！');
+            if (errorBank[currentQuestion.id]) {
+                errorBank[currentQuestion.id]--;
+                if (errorBank[currentQuestion.id] === 0) {
+                    delete errorBank[currentQuestion.id];
+                }
+                localStorage.setItem('errorBank', JSON.stringify(errorBank));
+            }
+        } else {
+            alert(`回答错误。正确答案是：${currentQuestion.en} - ${currentQuestion.zh}`);
+            errorBank[currentQuestion.id] = (errorBank[currentQuestion.id] || 0) + 1;
+            localStorage.setItem('errorBank', JSON.stringify(errorBank));
+        }
+        nextQuestion(document.querySelector('button[onclick^="startSelectedGame"]').getAttribute('onclick').includes('en-to-zh') ? 'en-to-zh' : 'zh-to-en');
+    }
+
+    function endGame() {
+        document.getElementById('game-container').innerHTML = `
+            <h2>游戏结束！</h2>
+            <p>你的得分是：${score} / ${totalQuestions}</p>
+        `;
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    // 初始化
+    loadWords();
+    </script>
+</body>
+</html>

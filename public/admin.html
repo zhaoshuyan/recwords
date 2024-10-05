@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>词根掌握度测试游戏 - 管理端</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1, h2 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        #import-section, #word-selection, #statistics-section {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .word-checkbox {
+            margin-right: 10px;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .pagination button {
+            margin: 0 5px;
+        }
+        .word-type-selector {
+            margin-bottom: 15px;
+        }
+        .word-type-selector label {
+            margin-right: 15px;
+        }
+        #error-management {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .filter-controls {
+            margin-bottom: 20px;
+        }
+        input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            margin-right: 10px;
+        }
+        #error-word-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .error-word-item {
+            width: calc(50% - 5px);
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .error-word-item label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .error-word-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .error-counts {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .error-word-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .error-word-item {
+            width: 48%;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .error-word-item label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+        .error-word-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .error-counts {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .word-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .word-item {
+            width: 24%;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+        }
+        .word-item.root {
+            background-color: #ffeeba;
+            border-color: #ffc107;
+        }
+        .word-item input[type="checkbox"] {
+            margin-right: 5px;
+        }
+        #word-list {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>词根掌握度测试游戏 - 管理端</h1>
+    <div id="import-section">
+        <h2>导入单词</h2>
+        <input type="file" id="excel-file" accept=".xlsx, .xls, .csv">
+        <button onclick="importWords()">导入Excel/CSV文件</button>
+        <button onclick="clearDatabase()">清除数据库</button>
+    </div>
+    <div id="word-selection">
+        <h2>选择要测试的单词</h2>
+        <div class="word-type-selector">
+            <label>
+                <input type="checkbox" id="select-words" checked onchange="toggleWordType('words')"> 普通单词
+            </label>
+            <label>
+                <input type="checkbox" id="select-roots" checked onchange="toggleWordType('roots')"> 词根
+            </label>
+        </div>
+        <div>
+            <h3>选择测试模式：</h3>
+            <select id="test-mode">
+                <option value="en-to-zh">英译中</option>
+                <option value="zh-to-en">中译英</option>
+                <option value="mixed">混合模式</option>
+            </select>
+        </div>
+        <button onclick="saveSelectedWords()">保存选择和测试模式</button>
+        <div>
+            <button onclick="selectAllWords()">全选</button>
+            <button onclick="deselectAllWords()">取消全选</button>
+        </div>
+        <div id="word-list"></div>
+        <div class="pagination">
+            <button onclick="changePage(-1)">上一页</button>
+            <span id="page-info"></span>
+            <button onclick="changePage(1)">下一页</button>
+        </div>
+    </div>
+    <div id="error-management">
+        <h2>错题管理</h2>
+        <button onclick="clearErrorBank()">清除错题库</button>
+        <div class="filter-controls">
+            <label for="error-count">最小错误次数：</label>
+            <input type="number" id="error-count" min="1" value="1">
+            <label for="correct-count">最大正确次数：</label>
+            <input type="number" id="correct-count" min="0" value="2">
+            <button onclick="filterErrorWords()">筛选</button>
+        </div>
+        <div id="error-word-list"></div>
+        <div class="pagination">
+            <button onclick="changeErrorPage(-1)">上一页</button>
+            <span id="error-page-info"></span>
+            <button onclick="changeErrorPage(1)">下一页</button>
+        </div>
+        <button onclick="selectAllErrorWords()">全选</button>
+        <button onclick="deselectAllErrorWords()">取消全选</button>
+        <button onclick="saveSelectedErrorWords()">保存选中的错题</button>
+        <button onclick="startErrorTest()">开始错题测试</button>
+    </div>
+    <div id="statistics-section">
+        <h2>测试统计</h2>
+        <div id="statistics-content"></div>
+    </div>
+
+    <script>
+    let wordDatabase = [];
+    let selectedWords = [];
+    let currentPage = 1;
+    const wordsPerPage = 60; // 修改为每页显示60个单词
+    let showingWords = true;
+    let showingRoots = true;
+    let errorWords = [];
+    let errorCurrentPage = 1;
+    const errorWordsPerPage = 10;
+
+    function importWords() {
+        const fileInput = document.getElementById('excel-file');
+        const file = fileInput.files[0];
+        if (!file) {
+            alert('请选择一个Excel或CSV文件');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('file', file);
+        fetch('/import_words', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                alert(data.message);
+                loadWords();
+            }
+        })
+        .catch(error => console.error('Error importing words:', error));
+    }
+
+    function clearDatabase() {
+        if (confirm('确定要清除数据库吗？这将删除所有单词数据。')) {
+            fetch('/clear_database', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    loadWords();
+                })
+                .catch(error => {
+                    console.error('Error clearing database:', error);
+                    alert('清除数据库时出错，请查看控制台以获取更多信息。');
+                });
+        }
+    }
+
+    function loadWords() {
+        console.log('Loading words...');
+        fetch('/words')
+        .then(response => response.json())
+        .then(data => {
+            console.log('Words loaded:', data);
+            wordDatabase = data;
+            initializeWordList();
+        })
+        .catch(error => {
+            console.error('Error loading words:', error);
+            alert('加载单词时出错，请查看控制台以获取更多信息。');
+        });
+    }
+
+    function initializeWordList() {
+        const wordList = document.getElementById('word-list');
+        wordList.innerHTML = '';
+        const startIndex = (currentPage - 1) * wordsPerPage;
+        const endIndex = startIndex + wordsPerPage;
+        const currentWords = wordDatabase.filter(word => 
+            (showingWords && !word.is_root) || (showingRoots && word.is_root)
+        ).slice(startIndex, endIndex);
+
+        if (currentWords.length === 0) {
+            wordList.innerHTML = '<p>没有找到单词。</p>';
+        } else {
+            for (let i = 0; i < currentWords.length; i += 4) {
+                const row = document.createElement('div');
+                row.className = 'word-row';
+                
+                for (let j = 0; j < 4 && i + j < currentWords.length; j++) {
+                    const word = currentWords[i + j];
+                    const wordItem = document.createElement('div');
+                    wordItem.className = `word-item ${word.is_root ? 'root' : ''}`;
+                    wordItem.innerHTML = `
+                        <input type="checkbox" class="word-checkbox" value="${word.id}" onchange="toggleWordSelection(${word.id}, this)" ${selectedWords.includes(word.id) ? 'checked' : ''}>
+                        <span>${startIndex + i + j + 1}. ${word.en} - ${word.zh}</span>
+                    `;
+                    row.appendChild(wordItem);
+                }
+
+                wordList.appendChild(row);
+            }
+        }
+
+        updatePageInfo();
+    }
+
+    function updatePageInfo() {
+        const totalWords = wordDatabase.filter(word => 
+            (showingWords && !word.is_root) || (showingRoots && word.is_root)
+        ).length;
+        const totalPages = Math.ceil(totalWords / wordsPerPage);
+        document.getElementById('page-info').textContent = `第 ${currentPage} 页，共 ${totalPages} 页`;
+    }
+
+    function changePage(delta) {
+        const totalWords = wordDatabase.filter(word => 
+            (showingWords && !word.is_root) || (showingRoots && word.is_root)
+        ).length;
+        const totalPages = Math.ceil(totalWords / wordsPerPage);
+        currentPage = Math.max(1, Math.min(currentPage + delta, totalPages));
+        initializeWordList();
+    }
+
+    function toggleWordType(type) {
+        if (type === 'words') {
+            showingWords = !showingWords;
+        } else if (type === 'roots') {
+            showingRoots = !showingRoots;
+        }
+        currentPage = 1;
+        initializeWordList();
+    }
+
+    function toggleAllWords(checkbox) {
+        const checkboxes = document.getElementsByClassName('word-checkbox');
+        for (let i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].checked = checkbox.checked;
+            toggleWordSelection(parseInt(checkboxes[i].value), checkboxes[i]);
+        }
+    }
+
+    function selectAllWords() {
+        const checkboxes = document.getElementsByClassName('word-checkbox');
+        for (let i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].checked = true;
+            toggleWordSelection(parseInt(checkboxes[i].value), checkboxes[i]);
+        }
+    }
+
+    function deselectAllWords() {
+        const checkboxes = document.getElementsByClassName('word-checkbox');
+        for (let i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].checked = false;
+            toggleWordSelection(parseInt(checkboxes[i].value), checkboxes[i]);
+        }
+    }
+
+    function toggleWordSelection(wordId, checkbox) {
+        const index = selectedWords.indexOf(wordId);
+        if (checkbox.checked && index === -1) {
+            selectedWords.push(wordId);
+        } else if (!checkbox.checked && index > -1) {
+            selectedWords.splice(index, 1);
+        }
+    }
+
+    function saveSelectedWords() {
+        const testMode = document.getElementById('test-mode').value;
+        fetch('/save-selected-words', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                selectedWords: selectedWords,
+                testMode: testMode
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+        })
+        .catch(error => console.error('Error saving selected words and test mode:', error));
+    }
+
+    function loadStatistics() {
+        console.log('Loading statistics...');
+        fetch('/statistics')
+        .then(response => response.json())
+        .then(data => {
+            console.log('Statistics loaded:', data);
+            const statisticsContent = document.getElementById('statistics-content');
+            statisticsContent.innerHTML = `
+                <p>总测试次数：${data.totalTests}</p>
+                <p>平均得分：${data.averageScore.toFixed(2)}</p>
+                <p>最高得分：${data.highestScore}</p>
+                <p>最低得分：${data.lowestScore}</p>
+            `;
+        })
+        .catch(error => console.error('Error loading statistics:', error));
+    }
+
+    function loadErrorWords() {
+        console.log('Loading error words...');
+        fetch('/error_words')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Error words loaded:', data);
+                // 只保留错误次数大于0的单词
+                errorWords = data.filter(word => word.error_count > 0);
+                displayErrorWords();
+            })
+            .catch(error => console.error('Error loading error words:', error));
+    }
+
+    function displayErrorWords() {
+        const list = document.getElementById('error-word-list');
+        list.innerHTML = '';
+        const startIndex = (errorCurrentPage - 1) * errorWordsPerPage;
+        const endIndex = startIndex + errorWordsPerPage;
+        const currentErrorWords = errorWords.slice(startIndex, endIndex);
+
+        for (let i = 0; i < currentErrorWords.length; i += 2) {
+            const row = document.createElement('div');
+            row.className = 'error-word-row';
+            row.innerHTML = `
+                <div class="error-word-item">
+                    <label>
+                        <input type="checkbox" class="error-word-checkbox" value="${currentErrorWords[i].id}">
+                        ${currentErrorWords[i].en} - ${currentErrorWords[i].zh}
+                    </label>
+                    <span class="error-counts">错误: ${currentErrorWords[i].error_count}</span>
+                </div>
+            `;
+            if (i + 1 < currentErrorWords.length) {
+                row.innerHTML += `
+                    <div class="error-word-item">
+                        <label>
+                            <input type="checkbox" class="error-word-checkbox" value="${currentErrorWords[i+1].id}">
+                            ${currentErrorWords[i+1].en} - ${currentErrorWords[i+1].zh}
+                        </label>
+                        <span class="error-counts">错误: ${currentErrorWords[i+1].error_count}</span>
+                    </div>
+                `;
+            }
+            list.appendChild(row);
+        }
+
+        updateErrorPageInfo();
+    }
+
+    function updateErrorPageInfo() {
+        const totalPages = Math.ceil(errorWords.length / errorWordsPerPage);
+        document.getElementById('error-page-info').textContent = `第 ${errorCurrentPage} 页，共 ${totalPages} 页`;
+    }
+
+    function changeErrorPage(delta) {
+        const totalPages = Math.ceil(errorWords.length / errorWordsPerPage);
+        errorCurrentPage = Math.max(1, Math.min(errorCurrentPage + delta, totalPages));
+        displayErrorWords();
+    }
+
+    function filterErrorWords() {
+        const minErrorCount = parseInt(document.getElementById('error-count').value);
+        const maxCorrectCount = parseInt(document.getElementById('correct-count').value);
+        const filteredWords = errorWords.filter(word => 
+            word.error_count >= minErrorCount && (word.correct_count || 0) <= maxCorrectCount
+        );
+        errorWords = filteredWords;
+        errorCurrentPage = 1;
+        displayErrorWords();
+    }
+
+    function selectAllErrorWords() {
+        const checkboxes = document.querySelectorAll('.error-word-checkbox');
+        checkboxes.forEach(checkbox => checkbox.checked = true);
+    }
+
+    function deselectAllErrorWords() {
+        const checkboxes = document.querySelectorAll('.error-word-checkbox');
+        checkboxes.forEach(checkbox => checkbox.checked = false);
+    }
+
+    function saveSelectedErrorWords() {
+        const selectedErrorWords = Array.from(document.querySelectorAll('.error-word-checkbox:checked'))
+            .map(checkbox => parseInt(checkbox.value));
+        
+        fetch('/save-selected-error-words', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ selectedErrorWords })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('选中的错题已保存');
+            } else {
+                alert('保存选中的错题失败');
+            }
+        })
+        .catch(error => console.error('Error saving selected error words:', error));
+    }
+
+    function startErrorTest() {
+        const selectedErrorWords = Array.from(document.querySelectorAll('.error-word-checkbox:checked'))
+            .map(checkbox => parseInt(checkbox.value));
+        
+        if (selectedErrorWords.length === 0) {
+            alert('请选择至少一个错题进行测试');
+            return;
+        }
+
+        fetch('/save-selected-error-words', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ selectedErrorWords })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '/error_test';
+            } else {
+                alert('保存选中的错题失败');
+            }
+        })
+        .catch(error => console.error('Error saving selected error words:', error));
+    }
+
+    function clearErrorBank() {
+        if (confirm('确定要清除错题库吗？这将删除所有错题记录。')) {
+            fetch('/clear_error_bank', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    loadErrorWords();
+                })
+                .catch(error => {
+                    console.error('Error clearing error bank:', error);
+                    alert('清除错题库时出错，请查看控制台以获取更多信息。');
+                });
+        }
+    }
+
+    // 初始化
+    console.log('Initializing admin page...');
+    loadWords();
+    loadStatistics();
+    loadErrorWords();
+    </script>
+</body>
+</html>

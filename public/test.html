@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>词根掌握度测试游戏 - 测试端</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1, h2 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        #game-container, #result-container, #incorrect-answers {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #feedback {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .correct {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .incorrect {
+            background-color: #e74c3c;
+            color: white;
+        }
+        #progress {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>词根掌握度测试游戏 - 测试端</h1>
+    <button onclick="startGame()">开始测试</button>
+    <div id="progress"></div>
+    <div id="game-container"></div>
+    <div id="feedback"></div>
+    <div id="incorrect-answers"></div>
+
+    <script>
+    let currentWords = [];
+    let allWords = [];
+    let currentQuestion = null;
+    let score = 0;
+    let totalQuestions = 0;
+    let answeredQuestions = 0;
+    let incorrectAnswers = [];
+    let currentMode = '';
+
+    function startGame() {
+        fetch('/get-selected-words')
+        .then(response => response.json())
+        .then(data => {
+            allWords = data.words;
+            currentWords = [...allWords];
+            currentMode = data.testMode;
+            score = 0;
+            totalQuestions = currentWords.length;
+            answeredQuestions = 0;
+            incorrectAnswers = [];
+            if (currentWords.length === 0) {
+                alert('没有选择要测试的单词，请先在管理端选择单词。');
+                return;
+            }
+            updateProgress();
+            nextQuestion();
+        })
+        .catch(error => console.error('Error getting selected words:', error));
+    }
+
+    function updateProgress() {
+        const progressElement = document.getElementById('progress');
+        progressElement.textContent = `进度: ${answeredQuestions}/${totalQuestions} 题`;
+    }
+
+    function nextQuestion() {
+        if (answeredQuestions >= totalQuestions) {
+            endGame();
+            return;
+        }
+
+        const index = Math.floor(Math.random() * currentWords.length);
+        currentQuestion = currentWords[index];
+        currentWords.splice(index, 1);
+
+        let questionMode = currentMode;
+        if (currentMode === 'mixed') {
+            questionMode = Math.random() < 0.5 ? 'en-to-zh' : 'zh-to-en';
+        }
+
+        let questionHtml = '';
+        if (questionMode === 'en-to-zh') {
+            questionHtml = `
+                <h2>请选择"${currentQuestion.en}"的中文含义：</h2>
+                ${generateOptions('zh')}
+            `;
+        } else {
+            questionHtml = `
+                <h2>请选择"${currentQuestion.zh}"的英文单词：</h2>
+                ${generateOptions('en')}
+            `;
+        }
+
+        document.getElementById('game-container').innerHTML = questionHtml;
+        document.getElementById('feedback').innerHTML = '';
+    }
+
+    function generateOptions(lang) {
+        const options = [currentQuestion[lang]];
+        const availableWords = allWords.filter(word => word.id !== currentQuestion.id);
+        while (options.length < 4 && availableWords.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availableWords.length);
+            const randomWord = availableWords[randomIndex][lang];
+            if (!options.includes(randomWord)) {
+                options.push(randomWord);
+                availableWords.splice(randomIndex, 1);
+            }
+        }
+        shuffleArray(options);
+
+        return options.map((option, index) => 
+            `<button onclick="checkAnswer('${option.replace(/'/g, "\\'")}')">${option}</button>`
+        ).join('');
+    }
+
+    function checkAnswer(answer) {
+        const feedbackElement = document.getElementById('feedback');
+        const isCorrect = (answer === currentQuestion.en || answer === currentQuestion.zh);
+        
+        if (isCorrect) {
+            score++;
+            feedbackElement.textContent = '回答正确！';
+            feedbackElement.className = 'correct';
+        } else {
+            feedbackElement.textContent = `回答错误。正确答案是：${currentQuestion.en} - ${currentQuestion.zh}`;
+            feedbackElement.className = 'incorrect';
+            incorrectAnswers.push(currentQuestion);
+        }
+
+        // 无论答案是否正确，都更新错题库
+        updateErrorBank(currentQuestion.id, isCorrect);
+
+        answeredQuestions++;
+        updateProgress();
+
+        // 禁用所有按钮，防止重复点击
+        const buttons = document.querySelectorAll('#game-container button');
+        buttons.forEach(button => button.disabled = true);
+
+        setTimeout(() => {
+            nextQuestion();
+        }, 1500);
+    }
+
+    function updateErrorBank(wordId, isCorrect) {
+        fetch('/update-error-word', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wordId: wordId, isCorrect: isCorrect })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Error bank update response:', data);
+        })
+        .catch(error => console.error('Error updating error bank:', error));
+    }
+
+    function endGame() {
+        let gameEndHtml = `
+            <h2>测试结束！</h2>
+            <p>你的得分是：${score} / ${totalQuestions}</p>
+        `;
+        
+        if (incorrectAnswers.length > 0) {
+            gameEndHtml += '<h3>错误题目：</h3><ul>';
+            incorrectAnswers.forEach(question => {
+                gameEndHtml += `<li>${question.en} - ${question.zh}</li>`;
+            });
+            gameEndHtml += '</ul>';
+        }
+        
+        document.getElementById('game-container').innerHTML = gameEndHtml;
+        document.getElementById('feedback').innerHTML = '';
+        document.getElementById('progress').innerHTML = '';
+        saveTestRecord();
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    function saveTestRecord() {
+        fetch('/test_records', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: 1, // 假设用户ID为1
+                score: score,
+                total_questions: totalQuestions,
+            }),
+        })
+        .then(response => response.json())
+        .then(data => console.log('Test record saved:', data))
+        .catch(error => console.error('Error saving test record:', error));
+    }
+    </script>
+</body>
+</html>

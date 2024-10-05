@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错题管理 - 词根掌握度测试游戏</title>
+    <style>
+        /* 复用之前的样式 */
+    </style>
+</head>
+<body>
+    <h1>错题管理</h1>
+    <div id="error-word-list"></div>
+    <div>
+        <label for="error-count">最小错误次数：</label>
+        <input type="number" id="error-count" min="1" value="1">
+        <label for="correct-count">最大正确次数：</label>
+        <input type="number" id="correct-count" min="0" value="2">
+        <button onclick="filterErrorWords()">筛选</button>
+    </div>
+    <button onclick="startErrorTest()">开始错题测试</button>
+
+    <script>
+    let errorWords = [];
+
+    function loadErrorWords() {
+        fetch('/error_words')
+        .then(response => response.json())
+        .then(data => {
+            errorWords = data;
+            displayErrorWords();
+        })
+        .catch(error => console.error('Error loading error words:', error));
+    }
+
+    function displayErrorWords() {
+        const list = document.getElementById('error-word-list');
+        list.innerHTML = '';
+        errorWords.forEach(word => {
+            const item = document.createElement('div');
+            item.innerHTML = `
+                <input type="checkbox" value="${word.id}">
+                ${word.en} - ${word.zh} (错误次数: ${word.error_count}, 正确次数: ${word.correct_count})
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function filterErrorWords() {
+        const minErrorCount = document.getElementById('error-count').value;
+        const maxCorrectCount = document.getElementById('correct-count').value;
+        const filteredWords = errorWords.filter(word => 
+            word.error_count >= minErrorCount && word.correct_count <= maxCorrectCount
+        );
+        errorWords = filteredWords;
+        displayErrorWords();
+    }
+
+    function startErrorTest() {
+        const selectedWords = Array.from(document.querySelectorAll('#error-word-list input:checked'))
+            .map(input => parseInt(input.value));
+        if (selectedWords.length === 0) {
+            alert('请选择至少一个错题进行测试');
+            return;
+        }
+        fetch('/save-error-test-words', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ selectedWords })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '/error_test';
+            } else {
+                alert('保存选中的错题失败');
+            }
+        })
+        .catch(error => console.error('Error saving error test words:', error));
+    }
+
+    loadErrorWords();
+    </script>
+</body>
+</html>
